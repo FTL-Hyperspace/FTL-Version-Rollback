@@ -8,7 +8,7 @@ A collection of patches used to rollback FTL: Faster Than Light to a version sup
 
 ## How to use
 
-1. Code > Download ZIP, then extract it.
+1. Code > [Download ZIP](https://github.com/FTL-Hyperspace/FTL-Version-Rollback/archive/refs/heads/main.zip), then extract it.
 2. Copy the contents into your FTL folder (where `FTLGame.exe` is).
 3. Run `rollback.bat`.
 
