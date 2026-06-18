@@ -25,21 +25,35 @@ if not exist "FTLGame.exe" (
 echo.
 echo Select your game store:
 echo   1. Steam
-echo   2. Epic Games
-echo   3. Microsoft Store
-echo   4. Origin
+echo   2. GOG
+echo   3. Epic Games
+echo   4. Origin (Old)
+echo   5. EA
+echo   6. Microsoft (Old)
+echo   7. DRM Free (Includes Humble)
 echo   0. Exit without patching
 echo.
 
 :: User input
-choice /c 12340 /n /m "Enter your choice (1-4, 0 to exit): "
+choice /c 12345670 /n /m "Enter your choice (1-7, 0 to exit): "
 
-:: Choices
-if errorlevel 5 goto :exit
-if errorlevel 4 set STORE=microsoft‚
-if errorlevel 3 set STORE=origin
-if errorlevel 2 set STORE=epic
-if errorlevel 1 set STORE=steam
+:: Exact match on errorlevel
+if %errorlevel% == 8 goto :exit
+if %errorlevel% == 7 set STORE=Humble
+if %errorlevel% == 6 set STORE=Microsoft
+if %errorlevel% == 5 set STORE=EA
+if %errorlevel% == 4 set STORE=Origin
+if %errorlevel% == 3 set STORE=Epic
+if %errorlevel% == 2 set STORE=GOG
+if %errorlevel% == 1 set STORE=Steam
+
+:: Fallback – should not happen
+if not defined STORE (
+    echo ERROR: Invalid selection.
+    goto :exit
+)
+
+echo Selected store: %STORE%
 
 :: For stores that have multiple patches (especially Steam), try all matching files
 set "PATCH_DIR=%CD%\patch\"
@@ -73,10 +87,11 @@ for /L %%i in (1,1,%COUNT%) do (
 
     echo Trying !CURNAME! ...
 
-    set "OUTFILE=%TEMP%\flips_out_%%i.txt"
-    "%CD%\patch\flips.exe" -a "!CURPATCH!" "%CD%\FTLGame.exe" > "!OUTFILE!" 2>&1
+    set "OUTFILE=%TEMP%\bpsapply_out_%%i.txt"
+    :: Correct order: target first, patch second
+    "%CD%\patch\bpsapply.exe" "%CD%\FTLGame.exe" "!CURPATCH!" > "!OUTFILE!" 2>&1
 
-    findstr /C:"This patch is not intended for this ROM" "!OUTFILE!" >nul
+    findstr /C:"#1: Source checksum doesn't match" "!OUTFILE!" >nul
     if errorlevel 1 (
         echo SUCCESS: !CURNAME! applied correctly.
         set SUCCESS=1
@@ -95,9 +110,11 @@ del "FTLGame_temp.exe" 2>nul
 if %SUCCESS% equ 0 (
     echo.
     echo ERROR: No compatible patch found for %STORE% version.
-    :restore
     echo Restoring original backup...
     copy /y "FTLGame_orig.exe" "FTLGame.exe"
+    if exist "FTLGame_orig.exe" (
+        del "FTLGame_orig.exe" 2>nul
+    )
 ) else (
     echo.
     echo Patch applied successfully!
@@ -105,6 +122,13 @@ if %SUCCESS% equ 0 (
 
 pause
 goto :end
+
+:restore
+echo Restoring original backup...
+copy /y "FTLGame_orig.exe" "FTLGame.exe"
+if exist "FTLGame_orig.exe" (
+    del "FTLGame_orig.exe" 2>nul
+)
 
 :exit
 echo No patch applied. Exiting.
