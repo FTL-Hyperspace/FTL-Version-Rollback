@@ -4,20 +4,24 @@ setlocal enabledelayedexpansion
 :: Change to the script's directory
 pushd "%~dp0"
 
+:: Check if the game executable exists
+if not exist "FTLGame.exe" (
+    echo ERROR: FTLGame.exe not found in the current folder.
+    goto :exit
+)
+
 :: Create a backup of the original executable if not already present
 if not exist "FTLGame_orig.exe" (
     echo Creating backup: FTLGame_orig.exe
     copy "FTLGame.exe" "FTLGame_orig.exe"
+    if errorlevel 1 (
+        echo ERROR: Could not create FTLGame_orig.exe.
+        goto :exit
+    )
 ) else (
-    :: Abort if there was already done a patched
+    :: Abort if the patch was already run
     echo Patch already ran since FTLGame_orig.exe already exists.
     goto :exit
-)
-
-:: Check if the game executable exists
-if not exist "FTLGame.exe" (
-    echo ERROR: FTLGame.exe not found in the current folder.
-    goto :restore
 )
 
 
@@ -56,19 +60,21 @@ if not defined STORE (
 echo Selected store: %STORE%
 
 :: For stores that have multiple patches (especially Steam), try all matching files
-set "PATCH_DIR=%CD%\patch\"
 set SUCCESS=0
 
 echo Current directory: %CD%
-:: Build list using dir /b to avoid wildcard oddities
+:: Use a relative wildcard here. Expanding an absolute path containing parentheses
+:: (for example, "Program Files (x86)") inside FOR breaks cmd.exe parsing.
 set COUNT=0
-for /f "delims=" %%F in ('dir /b "%PATCH_DIR%\%STORE%-*.bps" 2^>nul') do (
-    set /a COUNT+=1
-    set "PATCHES[!COUNT!]=%%F"
+for %%F in ("patch\%STORE%-*.bps") do (
+    if exist "%%~fF" (
+        set /a COUNT+=1
+        set "PATCHES[!COUNT!]=%%~nxF"
+    )
 )
 
 if %COUNT% equ 0 (
-    echo ERROR: No patch files found for %STORE% in %PATCH_DIR%
+    echo ERROR: No patch files found for %STORE% in the patch folder.
     pause
     goto :restore
 )
@@ -82,17 +88,17 @@ copy /y "FTLGame.exe" "FTLGame_temp.exe" >nul
 :: Try each patch
 for /L %%i in (1,1,%COUNT%) do (
     set "CURFILE=!PATCHES[%%i]!"
-    set "CURPATCH=%PATCH_DIR%\!CURFILE!"
+    set "CURPATCH=patch\!CURFILE!"
     set "CURNAME=!CURFILE!"
 
     echo Trying !CURNAME! ...
 
-    set "OUTFILE=%TEMP%\bpsapply_out_%%i.txt"
+    set "OUTFILE=!TEMP!\bpsapply_out_%%i.txt"
     :: Correct order: target first, patch second
-    "%CD%\patch\bpsapply.exe" "%CD%\FTLGame.exe" "!CURPATCH!" > "!OUTFILE!" 2>&1
+    "patch\bpsapply.exe" "FTLGame.exe" "!CURPATCH!" > "!OUTFILE!" 2>&1
+    set "PATCH_RESULT=!errorlevel!"
 
-    findstr /C:"#1: Source checksum doesn't match" "!OUTFILE!" >nul
-    if errorlevel 1 (
+    if "!PATCH_RESULT!"=="0" (
         echo SUCCESS: !CURNAME! applied correctly.
         set SUCCESS=1
         del "!OUTFILE!" 2>nul
